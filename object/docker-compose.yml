@@ -1,0 +1,64 @@
+version: '3.7'
+
+services:
+
+  nginx-proxy:
+    image: jwilder/nginx-proxy:0.6.0
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - certs:/etc/nginx/certs:ro
+      - confd:/etc/nginx/conf.d
+      - vhostd:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+    labels:
+      - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
+
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion:v1.12
+    restart: always
+    volumes:
+      - certs:/etc/nginx/certs:rw
+      - confd:/etc/nginx/conf.d
+      - vhostd:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  minio:
+    image: minio/minio
+    container_name: object
+    command: server /data
+    ports:
+      - 9001:9000
+    environment:
+      MINIO_ACCESS_KEY: EXAMPLEKEY777
+      MINIO_SECRET_KEY: EXAMPLEKEY/777
+      MINIO_DOMAIN: s3.concienciadesarrollista.com
+      VIRTUAL_HOST: s3.concienciadesarrollista.com
+      LETSENCRYPT_HOST: s3.concienciadesarrollista.com
+      LETSENCRYPT_EMAIL: pablo@ejemplo.com
+    volumes:
+      - ~/docker/minio-data:/data
+      
+  mc:
+    image: minio/mc:latest
+    container_name: objectmc
+    depends_on:
+     - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host rm local;
+      /usr/bin/mc config host add --quiet --api s3v4 local http://object:9000 EXAMPLEKEY777 EXAMPLEKEY/777;
+      /usr/bin/mc rb --force local/wordpress/;
+      /usr/bin/mc mb --quiet local/wordpress/;
+      /usr/bin/mc policy set public local/wordpress;
+      "
+
+volumes:
+  certs:
+  confd:
+  vhostd:
+  html:
