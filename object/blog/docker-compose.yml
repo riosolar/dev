@@ -1,0 +1,63 @@
+version: '3.7'
+
+services:
+
+  nginx-proxy:
+    image: jwilder/nginx-proxy:0.6.0
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - certs:/etc/nginx/certs:ro
+      - confd:/etc/nginx/conf.d
+      - vhostd:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+    labels:
+      - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
+
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion:v1.12
+    restart: always
+    volumes:
+      - certs:/etc/nginx/certs:rw
+      - confd:/etc/nginx/conf.d
+      - vhostd:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+   mysql:
+    image: mysql:8.0.13
+    ports:
+      - 3306
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - ~/docker/mysql-data:/var/lib/mysql
+  
+  wordpress:
+    image: wordpress:latest
+    ports:
+      - 8080:80
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: root
+      WORDPRESS_DB_NAME: wordpress
+      VIRTUAL_HOST: www.blog.concienciadesarrollista.com
+      LETSENCRYPT_HOST: www.blog.concienciadesarrollista.com
+      LETSENCRYPT_EMAIL: pablo@example.com
+    depends_on:
+      - mysql
+    volumes:
+      - ./var/lib/docker/volumes/wp-content/_data:/var/www/html/wp-content
+      	
+
+volumes:
+  certs:
+  confd:
+  vhostd:
+  html:
